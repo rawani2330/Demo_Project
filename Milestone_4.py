@@ -57,33 +57,25 @@ else:
 
         col1, col2, col3, col4 = st.columns(4)
         col1.markdown(f"<div style='background-color:#5c5174; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Total Forecast</h4><h3>{int(forecast.sum())}</h3>"
-                      f"<p>Sum of all forecasted units</p></div>", unsafe_allow_html=True)
+                      f"<h4>Total Forecast</h4><h3>{int(forecast.sum())}</h3></div>", unsafe_allow_html=True)
         col2.markdown(f"<div style='background-color:#66669a; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Total Usage</h4><h3>{int(units.sum())}</h3>"
-                      f"<p>Sum of actual units used</p></div>", unsafe_allow_html=True)
+                      f"<h4>Total Usage</h4><h3>{int(units.sum())}</h3></div>", unsafe_allow_html=True)
         col3.markdown(f"<div style='background-color:#aaa7cc; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Max Forecast</h4><h3>{int(forecast.max())}</h3>"
-                      f"<p>Peak forecast value</p></div>", unsafe_allow_html=True)
+                      f"<h4>Max Forecast</h4><h3>{int(forecast.max())}</h3></div>", unsafe_allow_html=True)
         col4.markdown(f"<div style='background-color:#926d88; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Max Actual Usage</h4><h3>{int(units.max())}</h3>"
-                      f"<p>Peak actual usage</p></div>", unsafe_allow_html=True)
-        
+                      f"<h4>Max Actual Usage</h4><h3>{int(units.max())}</h3></div>", unsafe_allow_html=True)
+
         st.markdown("<br><br>", unsafe_allow_html=True)
 
         col5, col6, col7, col8 = st.columns(4)
         col5.markdown(f"<div style='background-color:#be9fbf; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Average Forecast</h4><h3>{round(forecast.mean(),2)}</h3>"
-                      f"<p>Mean forecast value</p></div>", unsafe_allow_html=True)
+                      f"<h4>Average Forecast</h4><h3>{round(forecast.mean(),2)}</h3></div>", unsafe_allow_html=True)
         col6.markdown(f"<div style='background-color:#cdaa7d; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Average Actual Usage</h4><h3>{round(units.mean(),2)}</h3>"
-                      f"<p>Mean actual usage</p></div>", unsafe_allow_html=True)
+                      f"<h4>Average Actual Usage</h4><h3>{round(units.mean(),2)}</h3></div>", unsafe_allow_html=True)
         col7.markdown(f"<div style='background-color:#deb887; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Mean Absolute Error</h4><h3>{round(abs_error.mean(),2)}</h3>"
-                      f"<p>Forecast vs Actual</p></div>", unsafe_allow_html=True)
+                      f"<h4>Mean Absolute Error</h4><h3>{round(abs_error.mean(),2)}</h3></div>", unsafe_allow_html=True)
         col8.markdown(f"<div style='background-color:#85364f; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Forecast Accuracy (%)</h4><h3>{round(accuracy_pct.mean(),2)}%</h3>"
-                      f"<p>Average accuracy</p></div>", unsafe_allow_html=True)
+                      f"<h4>Forecast Accuracy (%)</h4><h3>{round(accuracy_pct.mean(),2)}%</h3></div>", unsafe_allow_html=True)
 
         st.markdown(f"**High Demand Periods (Actual > Forecast):** {high_demand_count}")
         st.markdown(f"**Low Demand Periods (Actual < Forecast):** {low_demand_count}")
@@ -186,11 +178,36 @@ else:
             ax.plot(filtered_data['forecast'], m*filtered_data['forecast']+b, color='red')
             st.pyplot(fig)
 
-    # ---- Risk Alert ----
+    # ---- Risk Alert (UPDATED) ----
     elif section == "Risk Alert":
-        threshold = st.slider("Threshold", 0, int(filtered_data['forecast'].max()))
-        high_risk = filtered_data[filtered_data['forecast'] > threshold]
-        st.dataframe(high_risk[['timestamp','region','service_type','forecast','units_used']])
+        st.subheader("Risk Alerts")
+
+        threshold = st.slider(
+            "Set Usage Threshold",
+            min_value=0,
+            max_value=int(filtered_data['forecast'].max()),
+            value=int(filtered_data['forecast']*0.8)
+        )
+
+        filtered_data['Risk Level'] = np.where(
+            filtered_data['forecast'] > threshold,
+            "🔴 Very Risky",
+            "🟢 Under Risk"
+        )
+
+        very_risky_count = (filtered_data['forecast'] > threshold).sum()
+        safe_count = (filtered_data['forecast'] <= threshold).sum()
+
+        col1, col2 = st.columns(2)
+        col1.metric("🔴 Very Risky Count", very_risky_count)
+        col2.metric("🟢 Under Risk Count", safe_count)
+
+        if very_risky_count == 0:
+            st.success("✅ All regions are under risk (Safe)")
+        else:
+            st.warning(f"⚠️ {very_risky_count} high-risk records detected!")
+
+        st.dataframe(filtered_data[['timestamp','region','service_type','forecast','units_used','Risk Level']])
 
     # ---- Model Accuracy ----
     elif section == "Model Accuracy":
