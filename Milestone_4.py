@@ -57,28 +57,36 @@ else:
 
         col1, col2, col3, col4 = st.columns(4)
         col1.markdown(f"<div style='background-color:#5c5174; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Total Forecast</h4><h3>{int(forecast.sum())}</h3></div>", unsafe_allow_html=True)
+                      f"<h4>Total Forecast</h4><h3>{int(forecast.sum())}</h3>"
+                      f"<p>Sum of all forecasted units</p></div>", unsafe_allow_html=True)
         col2.markdown(f"<div style='background-color:#66669a; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Total Usage</h4><h3>{int(units.sum())}</h3></div>", unsafe_allow_html=True)
+                      f"<h4>Total Usage</h4><h3>{int(units.sum())}</h3>"
+                      f"<p>Sum of actual units used</p></div>", unsafe_allow_html=True)
         col3.markdown(f"<div style='background-color:#aaa7cc; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Max Forecast</h4><h3>{int(forecast.max())}</h3></div>", unsafe_allow_html=True)
+                      f"<h4>Max Forecast</h4><h3>{int(forecast.max())}</h3>"
+                      f"<p>Peak forecast value</p></div>", unsafe_allow_html=True)
         col4.markdown(f"<div style='background-color:#926d88; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Max Usage</h4><h3>{int(units.max())}</h3></div>", unsafe_allow_html=True)
-
+                      f"<h4>Max Actual Usage</h4><h3>{int(units.max())}</h3>"
+                      f"<p>Peak actual usage</p></div>", unsafe_allow_html=True)
+        
         st.markdown("<br><br>", unsafe_allow_html=True)
 
         col5, col6, col7, col8 = st.columns(4)
         col5.markdown(f"<div style='background-color:#be9fbf; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Avg Forecast</h4><h3>{round(forecast.mean(),2)}</h3></div>", unsafe_allow_html=True)
+                      f"<h4>Average Forecast</h4><h3>{round(forecast.mean(),2)}</h3>"
+                      f"<p>Mean forecast value</p></div>", unsafe_allow_html=True)
         col6.markdown(f"<div style='background-color:#cdaa7d; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Avg Usage</h4><h3>{round(units.mean(),2)}</h3></div>", unsafe_allow_html=True)
+                      f"<h4>Average Actual Usage</h4><h3>{round(units.mean(),2)}</h3>"
+                      f"<p>Mean actual usage</p></div>", unsafe_allow_html=True)
         col7.markdown(f"<div style='background-color:#deb887; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>MAE</h4><h3>{round(abs_error.mean(),2)}</h3></div>", unsafe_allow_html=True)
+                      f"<h4>Mean Absolute Error</h4><h3>{round(abs_error.mean(),2)}</h3>"
+                      f"<p>Forecast vs Actual</p></div>", unsafe_allow_html=True)
         col8.markdown(f"<div style='background-color:#85364f; padding:5px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Accuracy %</h4><h3>{round(accuracy_pct.mean(),2)}%</h3></div>", unsafe_allow_html=True)
+                      f"<h4>Forecast Accuracy (%)</h4><h3>{round(accuracy_pct.mean(),2)}%</h3>"
+                      f"<p>Average accuracy</p></div>", unsafe_allow_html=True)
 
-        st.markdown(f"**High Demand Periods:** {high_demand_count}")
-        st.markdown(f"**Low Demand Periods:** {low_demand_count}")
+        st.markdown(f"**High Demand Periods (Actual > Forecast):** {high_demand_count}")
+        st.markdown(f"**Low Demand Periods (Actual < Forecast):** {low_demand_count}")
 
     # ---- Demand Trend ----
     elif section == "Demand Trend":
@@ -86,17 +94,17 @@ else:
 
         graph_type = st.radio(
             "Choose a graph type:",
-            ["Forecast vs Actual Usage", "Line Chart", "Bar Chart", "Area Chart",
-             "Service Pie Chart", "Scatter", "Histogram", "Cumulative Usage",
-             "Top Services", "Region Share", "Monthly Trend", "Quarterly Trend",
-             "Error Trend", "Scatter with Trendline"],
+            ["Forecast vs Actual Usage", "Line Chart", "Bar Chart", "Area Chart", "Service Pie Chart",
+             "Scatter", "Histogram", "Cumulative Usage", "Top Services", "Region Share",
+             "Monthly Trend", "Quarterly Trend", "Error Trend", "Scatter with Trendline"],
             horizontal=True
         )
 
         if graph_type == "Forecast vs Actual Usage":
-            fig, ax = plt.subplots()
-            ax.plot(filtered_data['timestamp'], filtered_data['units_used'])
-            ax.plot(filtered_data['timestamp'], filtered_data['forecast'])
+            fig, ax = plt.subplots(figsize=(10,5))
+            ax.plot(filtered_data['timestamp'], filtered_data['units_used'], linestyle='--', marker='o')
+            ax.plot(filtered_data['timestamp'], filtered_data['forecast'], marker='x')
+            plt.xticks(rotation=45)
             st.pyplot(fig)
 
         elif graph_type == "Line Chart":
@@ -108,10 +116,18 @@ else:
         elif graph_type == "Area Chart":
             st.area_chart(filtered_data.set_index('timestamp')['forecast'])
 
+        # ---- FIXED PIE ----
         elif graph_type == "Service Pie Chart":
-            service_data = filtered_data.groupby('service_type')['forecast'].sum().reset_index()
+            service_data = filtered_data.groupby('service_type')['forecast'].sum().sort_values(ascending=False)
+            top = service_data[:5]
+            others = service_data[5:].sum()
+            if others > 0:
+                top["Others"] = others
+            explode = [0.05]*len(top)
             fig, ax = plt.subplots()
-            ax.pie(service_data['forecast'], labels=service_data['service_type'], autopct='%1.1f%%')
+            ax.pie(top, labels=top.index, autopct='%1.1f%%',
+                   startangle=90, explode=explode,
+                   wedgeprops={'edgecolor':'black'})
             st.pyplot(fig)
 
         elif graph_type == "Scatter":
@@ -134,10 +150,18 @@ else:
             service_summary = filtered_data.groupby('service_type')[['units_used','forecast']].sum()
             st.bar_chart(service_summary)
 
+        # ---- FIXED PIE ----
         elif graph_type == "Region Share":
-            region_data = filtered_data.groupby('region')['forecast'].sum().reset_index()
+            region_data = filtered_data.groupby('region')['forecast'].sum().sort_values(ascending=False)
+            top = region_data[:5]
+            others = region_data[5:].sum()
+            if others > 0:
+                top["Others"] = others
+            explode = [0.05]*len(top)
             fig, ax = plt.subplots()
-            ax.pie(region_data['forecast'], labels=region_data['region'], autopct='%1.1f%%')
+            ax.pie(top, labels=top.index, autopct='%1.1f%%',
+                   startangle=90, explode=explode,
+                   wedgeprops={'edgecolor':'black'})
             st.pyplot(fig)
 
         elif graph_type == "Monthly Trend":
@@ -166,7 +190,7 @@ else:
     elif section == "Risk Alert":
         threshold = st.slider("Threshold", 0, int(filtered_data['forecast'].max()))
         high_risk = filtered_data[filtered_data['forecast'] > threshold]
-        st.dataframe(high_risk)
+        st.dataframe(high_risk[['timestamp','region','service_type','forecast','units_used']])
 
     # ---- Model Accuracy ----
     elif section == "Model Accuracy":
