@@ -35,7 +35,7 @@ filtered_data = data[
     (data['quarter'].isin(selected_quarters))
 ]
 
-# ---- Empty Check ----
+# ---- Check Empty ----
 if filtered_data.empty:
     st.warning("No data available for selected filters.")
 else:
@@ -58,6 +58,9 @@ else:
         units = filtered_data['units_used']
         forecast = filtered_data['forecast']
 
+        high_demand = (units > forecast).sum()
+        low_demand = (units < forecast).sum()
+
         col1, col2, col3, col4 = st.columns(4)
         col1.markdown(f"<div style='background:#5c5174;padding:10px;border-radius:10px;text-align:center'><h4>Total Forecast</h4><h3>{int(forecast.sum())}</h3></div>", unsafe_allow_html=True)
         col2.markdown(f"<div style='background:#66669a;padding:10px;border-radius:10px;text-align:center'><h4>Total Usage</h4><h3>{int(units.sum())}</h3></div>", unsafe_allow_html=True)
@@ -73,8 +76,8 @@ else:
         col8.markdown(f"<div style='background:#85364f;padding:10px;border-radius:10px;text-align:center'><h4>Accuracy %</h4><h3>{round(accuracy_pct.mean(),2)}%</h3></div>", unsafe_allow_html=True)
 
         # High / Low Demand
-        st.write(f"**High Demand Periods (Actual > Forecast):** {(units > forecast).sum()}")
-        st.write(f"**Low Demand Periods (Actual < Forecast):** {(units < forecast).sum()}")
+        st.markdown(f"**High Demand Periods (Actual > Forecast):** {high_demand}")
+        st.markdown(f"**Low Demand Periods (Actual < Forecast):** {low_demand}")
 
     # ================= DEMAND TREND =================
     elif section == "Demand Trend":
@@ -107,11 +110,22 @@ else:
         elif graph_type == "Area Chart":
             st.area_chart(filtered_data.set_index('timestamp')['forecast'])
 
+        # 🔥 FIXED PIE CHART
         elif graph_type == "Service Pie Chart":
-            data_pie = filtered_data.groupby('service_type')['forecast'].sum()
+            service_data = filtered_data.groupby('service_type')['forecast'].sum().sort_values(ascending=False)
+            top = service_data[:5]
+            others = service_data[5:].sum()
+            if others > 0:
+                top["Others"] = others
+
             fig, ax = plt.subplots(figsize=(7,7))
-            wedges, _, _ = ax.pie(data_pie, autopct='%1.1f%%', startangle=90)
-            ax.legend(wedges, data_pie.index, title="Service Type",
+            wedges, _, _ = ax.pie(
+                top,
+                autopct=lambda p: f'{p:.1f}%' if p > 3 else '',
+                startangle=90,
+                wedgeprops={'edgecolor':'black'}
+            )
+            ax.legend(wedges, top.index, title="Service Type",
                       loc="center left", bbox_to_anchor=(1,0,0.5,1))
             st.pyplot(fig)
 
@@ -134,10 +148,20 @@ else:
             st.bar_chart(filtered_data.groupby('service_type')[['units_used','forecast']].sum())
 
         elif graph_type == "Region Share":
-            data_pie = filtered_data.groupby('region')['forecast'].sum()
+            region_data = filtered_data.groupby('region')['forecast'].sum().sort_values(ascending=False)
+            top = region_data[:5]
+            others = region_data[5:].sum()
+            if others > 0:
+                top["Others"] = others
+
             fig, ax = plt.subplots(figsize=(7,7))
-            wedges, _, _ = ax.pie(data_pie, autopct='%1.1f%%', startangle=90)
-            ax.legend(wedges, data_pie.index, title="Region",
+            wedges, _, _ = ax.pie(
+                top,
+                autopct=lambda p: f'{p:.1f}%' if p > 3 else '',
+                startangle=90,
+                wedgeprops={'edgecolor':'black'}
+            )
+            ax.legend(wedges, top.index, title="Region",
                       loc="center left", bbox_to_anchor=(1,0,0.5,1))
             st.pyplot(fig)
 
@@ -181,6 +205,11 @@ else:
         col1.metric("Very Risky Count", (filtered_data['forecast'] > threshold).sum())
         col2.metric("Safe Count", (filtered_data['forecast'] <= threshold).sum())
         col3.metric("Risk Value", int(risk_value))
+
+        if (filtered_data['forecast'] > threshold).sum() == 0:
+            st.success("All regions are safe")
+        else:
+            st.warning("High risk detected!")
 
         st.dataframe(filtered_data[['timestamp','region','service_type','forecast','units_used','Risk']])
 
