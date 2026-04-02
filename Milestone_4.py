@@ -17,6 +17,9 @@ data = data.dropna(subset=['timestamp'])
 # 🔥 FIX duplicate service names
 data['service_type'] = data['service_type'].str.strip().str.lower()
 
+# 🔥 FIX duplicate region names (IMPORTANT FIX)
+data['region'] = data['region'].str.strip().str.lower()
+
 data['year'] = data['timestamp'].dt.year
 data['quarter'] = data['timestamp'].dt.quarter
 
@@ -122,24 +125,35 @@ else:
         elif graph_type == "Area Chart":
             st.area_chart(filtered_data.set_index('timestamp')['forecast'])
 
-        # ✅ FIXED PIE CHART (clean services + all visible)
         elif graph_type == "Service Pie Chart":
             service_data = filtered_data.groupby('service_type')['forecast'].sum().sort_values(ascending=False)
-
             service_data.index = service_data.index.str.title()
 
             fig, ax = plt.subplots(figsize=(7,7))
-            wedges, _, _ = ax.pie(
-                service_data.values,
-                autopct='%1.1f%%',
-                startangle=90
-            )
+            wedges, _, _ = ax.pie(service_data.values, autopct='%1.1f%%', startangle=90)
 
             ax.legend(wedges, service_data.index,
                       title="Service Type",
                       loc="center left",
                       bbox_to_anchor=(1,0,0.5,1))
 
+            st.pyplot(fig)
+
+        elif graph_type == "Region Share":
+            region_data = filtered_data.groupby('region')['forecast'].sum().sort_values(ascending=False)
+
+            # FIX: readable labels + correct mapping
+            region_data.index = region_data.index.str.title()
+
+            fig, ax = plt.subplots(figsize=(7,7))
+            wedges, _, _ = ax.pie(region_data.values, autopct='%1.1f%%', startangle=90)
+
+            ax.legend(wedges, region_data.index,
+                      title="Region",
+                      loc="center left",
+                      bbox_to_anchor=(1,0,0.5,1))
+
+            ax.axis('equal')
             st.pyplot(fig)
 
         elif graph_type == "Scatter":
@@ -160,15 +174,6 @@ else:
         elif graph_type == "Top Services":
             st.bar_chart(filtered_data.groupby('service_type')[['units_used','forecast']].sum())
 
-        elif graph_type == "Region Share":
-            region_data = filtered_data.groupby('region')['forecast'].sum().sort_values(ascending=False)
-
-            fig, ax = plt.subplots(figsize=(7,7))
-            ax.pie(region_data.values, labels=region_data.index, autopct='%1.1f%%')
-            ax.axis('equal')
-            st.pyplot(fig)
-
-        # ✅ FIXED MONTHLY TREND
         elif graph_type == "Monthly Trend":
             df_month = filtered_data.set_index('timestamp')
             monthly = df_month.resample('MS')[['units_used','forecast']].sum()
