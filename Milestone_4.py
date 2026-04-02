@@ -111,17 +111,30 @@ else:
             plt.xticks(rotation=45)
             st.pyplot(fig)
 
-        elif graph_type == "Service Pie Chart":
-            service_data = filtered_data.groupby('service_type')['forecast'].sum().sort_values(ascending=False)
-            top = service_data.head(5).copy()
-            others = service_data.iloc[5:].sum()
-            if others > 0:
-                top.loc["Others"] = others  # FIXED
+       elif graph_type == "Service Pie Chart":
+             service_data = filtered_data.groupby('service_type')['forecast'].sum().sort_values(ascending=False)
 
-            fig, ax = plt.subplots(figsize=(7,7))
-            ax.pie(top.values, labels=top.index, autopct='%1.1f%%', startangle=90)
-            ax.axis('equal')
-            st.pyplot(fig)
+            # Optional: make labels pretty (Title Case)
+            service_data.index = service_data.index.str.title()
+
+            fig, ax = plt.subplots(figsize=(8,8))
+
+            wedges, _, _ = ax.pie(
+                service_data.values,
+                autopct='%1.1f%%',
+                startangle=90
+        )
+
+        ax.legend(
+            wedges,
+            service_data.index,
+            title="Service Type",
+            loc="center left",
+            bbox_to_anchor=(1, 0, 0.5, 1)
+        )
+
+        ax.axis('equal')
+        st.pyplot(fig)
 
         elif graph_type == "Region Share":
             region_data = filtered_data.groupby('region')['forecast'].sum().sort_values(ascending=False)
