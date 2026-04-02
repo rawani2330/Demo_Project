@@ -48,24 +48,37 @@ else:
         horizontal=True
     )
 
-    # ---- KPI Overview ----
+    # ---- KPI Overview (RESTORED COLORS) ----
     if section == "KPI Overview":
         units = filtered_data['units_used']
         forecast = filtered_data['forecast']
+        high_demand_count = (units > forecast).sum()
+        low_demand_count = (units < forecast).sum()
 
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Forecast", int(forecast.sum()))
-        col2.metric("Total Usage", int(units.sum()))
-        col3.metric("Max Forecast", int(forecast.max()))
-        col4.metric("Max Usage", int(units.max()))
+        col1.markdown(f"<div style='background-color:#5c5174; padding:8px; border-radius:10px; text-align:center;'>"
+                      f"<h4>Total Forecast</h4><h3>{int(forecast.sum())}</h3></div>", unsafe_allow_html=True)
+        col2.markdown(f"<div style='background-color:#66669a; padding:8px; border-radius:10px; text-align:center;'>"
+                      f"<h4>Total Usage</h4><h3>{int(units.sum())}</h3></div>", unsafe_allow_html=True)
+        col3.markdown(f"<div style='background-color:#aaa7cc; padding:8px; border-radius:10px; text-align:center;'>"
+                      f"<h4>Max Forecast</h4><h3>{int(forecast.max())}</h3></div>", unsafe_allow_html=True)
+        col4.markdown(f"<div style='background-color:#926d88; padding:8px; border-radius:10px; text-align:center;'>"
+                      f"<h4>Max Actual Usage</h4><h3>{int(units.max())}</h3></div>", unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<br><br>", unsafe_allow_html=True)
 
         col5, col6, col7, col8 = st.columns(4)
-        col5.metric("Avg Forecast", round(forecast.mean(),2))
-        col6.metric("Avg Usage", round(units.mean(),2))
-        col7.metric("MAE", round(abs_error.mean(),2))
-        col8.metric("Accuracy %", round(accuracy_pct.mean(),2))
+        col5.markdown(f"<div style='background-color:#be9fbf; padding:8px; border-radius:10px; text-align:center;'>"
+                      f"<h4>Average Forecast</h4><h3>{round(forecast.mean(),2)}</h3></div>", unsafe_allow_html=True)
+        col6.markdown(f"<div style='background-color:#cdaa7d; padding:8px; border-radius:10px; text-align:center;'>"
+                      f"<h4>Average Usage</h4><h3>{round(units.mean(),2)}</h3></div>", unsafe_allow_html=True)
+        col7.markdown(f"<div style='background-color:#deb887; padding:8px; border-radius:10px; text-align:center;'>"
+                      f"<h4>MAE</h4><h3>{round(abs_error.mean(),2)}</h3></div>", unsafe_allow_html=True)
+        col8.markdown(f"<div style='background-color:#85364f; padding:8px; border-radius:10px; text-align:center;'>"
+                      f"<h4>Accuracy %</h4><h3>{round(accuracy_pct.mean(),2)}%</h3></div>", unsafe_allow_html=True)
+
+        st.markdown(f"**High Demand Periods:** {high_demand_count}")
+        st.markdown(f"**Low Demand Periods:** {low_demand_count}")
 
     # ---- Demand Trend ----
     elif section == "Demand Trend":
@@ -145,7 +158,7 @@ else:
             monthly_data = monthly_data.set_index('YearMonth')
             st.line_chart(monthly_data)
 
-    # ---- Risk Alert (UPDATED) ----
+    # ---- Risk Alert ----
     elif section == "Risk Alert":
         st.subheader("Risk Alerts")
 
@@ -156,38 +169,27 @@ else:
             value=int(filtered_data['forecast'].max() * 0.8)
         )
 
-        # Risk classification
         filtered_data['Risk Level'] = np.where(
             filtered_data['forecast'] > threshold,
             "🔴 Very Risky",
             "🟢 Under Risk"
         )
 
-        # Counts
         very_risky_count = (filtered_data['forecast'] > threshold).sum()
         safe_count = (filtered_data['forecast'] <= threshold).sum()
+        risk_value = filtered_data.loc[filtered_data['forecast'] > threshold, 'forecast'].sum()
 
-        # 🔥 NEW: Total Risk Value
-        risk_value = filtered_data.loc[
-            filtered_data['forecast'] > threshold, 'forecast'
-        ].sum()
-
-        # Display KPIs
         col1, col2, col3 = st.columns(3)
         col1.metric("🔴 Very Risky Count", very_risky_count)
         col2.metric("🟢 Under Risk Count", safe_count)
-        col3.metric("⚠️ Risk Detected Value", int(risk_value))
+        col3.metric("⚠️ Risk Value", int(risk_value))
 
-        # Message
         if very_risky_count == 0:
-            st.success("✅ All regions are under risk (Safe)")
+            st.success("✅ All safe")
         else:
             st.warning(f"⚠️ {very_risky_count} high-risk records detected!")
 
-        # Table
-        st.dataframe(
-            filtered_data[['timestamp','region','service_type','forecast','units_used','Risk Level']]
-        )
+        st.dataframe(filtered_data[['timestamp','region','service_type','forecast','units_used','Risk Level']])
 
     # ---- Model Accuracy ----
     elif section == "Model Accuracy":
