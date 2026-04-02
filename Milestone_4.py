@@ -56,7 +56,6 @@ else:
         high_demand_count = (units > forecast).sum()
         low_demand_count = (units < forecast).sum()
 
-        # First row of KPI cards
         col1, col2, col3, col4 = st.columns(4)
         col1.markdown(f"<div style='background-color:#5c5174; padding:5px; border-radius:10px; text-align:center;'>"
                       f"<h4>Total Forecast</h4><h3>{int(forecast.sum())}</h3>"
@@ -73,7 +72,6 @@ else:
         
         st.markdown("<br><br>", unsafe_allow_html=True)
 
-        # Second row of KPI cards
         col5, col6, col7, col8 = st.columns(4)
         col5.markdown(f"<div style='background-color:#be9fbf; padding:5px; border-radius:10px; text-align:center;'>"
                       f"<h4>Average Forecast</h4><h3>{round(forecast.mean(),2)}</h3>"
@@ -103,16 +101,11 @@ else:
             horizontal=True
         )
 
-        # ---- Graphs ----
         if graph_type == "Forecast vs Actual Usage":
             st.subheader("Forecast vs Actual Usage Over Time")
             fig, ax = plt.subplots(figsize=(10,5))
-            ax.plot(filtered_data['timestamp'], filtered_data['units_used'], label="Actual Usage", linestyle='--', marker='o')
-            ax.plot(filtered_data['timestamp'], filtered_data['forecast'], label="Forecast", linewidth=2, marker='x')
-            ax.set_xlabel("Time")
-            ax.set_ylabel("Units")
-            ax.legend()
-            ax.set_title("Forecast vs Actual Usage")
+            ax.plot(filtered_data['timestamp'], filtered_data['units_used'], linestyle='--', marker='o')
+            ax.plot(filtered_data['timestamp'], filtered_data['forecast'], marker='x')
             plt.xticks(rotation=45)
             st.pyplot(fig)
 
@@ -120,100 +113,41 @@ else:
             st.line_chart(filtered_data.set_index('timestamp')[['units_used', 'forecast']])
 
         elif graph_type == "Bar Chart":
-            st.subheader("Region-wise Forecast")
             region_data = filtered_data.groupby('region')['forecast'].sum()
             st.bar_chart(region_data)
 
         elif graph_type == "Area Chart":
             st.area_chart(filtered_data.set_index('timestamp')['forecast'])
 
-        elif graph_type == "Service Pie Chart":
-            st.subheader("Service Distribution")
-            service_data = filtered_data.groupby('service_type')['forecast'].sum().sort_values(ascending=False)
-            top_n = 5
-            top_services = service_data[:top_n]
-            others_sum = service_data[top_n:].sum()
-            final_service_data = top_services.copy()
-            if others_sum > 0:
-                final_service_data["Others"] = others_sum
-            explode = [0.05]*len(final_service_data)
-            fig, ax = plt.subplots(figsize=(7,7))
-            wedges, texts, autotexts = ax.pie(final_service_data, autopct='%1.1f%%', startangle=90, explode=explode, wedgeprops={'edgecolor':'black'})
-            ax.legend(wedges, final_service_data.index, title="Service Type", loc="center left", bbox_to_anchor=(1,0,0.5,1))
-            ax.set_title("Service Type Share")
-            st.pyplot(fig)
-
-        elif graph_type == "Scatter":
-            fig, ax = plt.subplots()
-            ax.scatter(filtered_data['units_used'], filtered_data['forecast'])
-            ax.set_xlabel("Actual")
-            ax.set_ylabel("Forecast")
-            ax.set_title("Actual vs Forecast")
-            st.pyplot(fig)
-
-        elif graph_type == "Histogram":
-            fig, ax = plt.subplots()
-            ax.hist(filtered_data['units_used'], bins=20)
-            ax.set_xlabel("Usage")
-            ax.set_ylabel("Frequency")
-            ax.set_title("Usage Distribution")
-            st.pyplot(fig)
-
-        elif graph_type == "Cumulative Usage":
-            st.subheader("Cumulative Usage vs Forecast")
-            cumulative = filtered_data[['units_used','forecast']].cumsum()
-            st.area_chart(cumulative.set_index(filtered_data['timestamp']))
-
-        elif graph_type == "Top Services":
-            st.subheader("Top Service Types by Usage vs Forecast")
-            service_summary = filtered_data.groupby('service_type')[['units_used','forecast']].sum()
-            st.bar_chart(service_summary)
-
-        elif graph_type == "Region Share":
-            st.subheader("Region-wise Forecast Share")
-            region_forecast = filtered_data.groupby('region')['forecast'].sum().sort_values(ascending=False)
-            top_n = 5
-            top_regions = region_forecast[:top_n]
-            others_sum = region_forecast[top_n:].sum()
-            final_region_data = top_regions.copy()
-            if others_sum > 0:
-                final_region_data["Others"] = others_sum
-            explode = [0.05]*len(final_region_data)
-            fig, ax = plt.subplots(figsize=(7,7))
-            wedges, texts, autotexts = ax.pie(final_region_data, autopct='%1.1f%%', startangle=90, explode=explode, wedgeprops={'edgecolor':'black'})
-            ax.legend(wedges, final_region_data.index, title="Region", loc="center left", bbox_to_anchor=(1,0,0.5,1))
-            ax.set_title("Region-wise Forecast Share")
-            st.pyplot(fig)
-
         elif graph_type == "Monthly Trend":
             st.subheader("Monthly Forecast Trend")
-            monthly_data = filtered_data.resample('M', on='timestamp')[['units_used','forecast']].sum()
+
+            filtered_data['timestamp'] = pd.to_datetime(filtered_data['timestamp'])
+            filtered_data['YearMonth'] = filtered_data['timestamp'].dt.to_period('M')
+
+            monthly_data = filtered_data.groupby('YearMonth')[['units_used','forecast']].sum().reset_index()
+            monthly_data['YearMonth'] = monthly_data['YearMonth'].astype(str)
+            monthly_data = monthly_data.set_index('YearMonth')
+
             st.line_chart(monthly_data)
 
         elif graph_type == "Quarterly Trend":
-            st.subheader("Quarterly Forecast Trend")
             quarterly_data = filtered_data.groupby(['year','quarter'])[['units_used','forecast']].sum().reset_index()
             quarterly_data['Year-Quarter'] = quarterly_data['year'].astype(str) + "-Q" + quarterly_data['quarter'].astype(str)
             st.bar_chart(quarterly_data.set_index('Year-Quarter')[['units_used','forecast']])
 
         elif graph_type == "Error Trend":
-            st.subheader("Prediction Error (Actual - Forecast)")
             st.line_chart(filtered_data.set_index('timestamp')['difference'])
 
         elif graph_type == "Scatter with Trendline":
-            st.subheader("Actual vs Forecast Scatter with Trendline")
             fig, ax = plt.subplots()
             ax.scatter(filtered_data['forecast'], filtered_data['units_used'])
             m,b = np.polyfit(filtered_data['forecast'], filtered_data['units_used'],1)
-            ax.plot(filtered_data['forecast'], m*filtered_data['forecast']+b, color='red', label='Trendline')
-            ax.set_xlabel("Forecast")
-            ax.set_ylabel("Actual Usage")
-            ax.legend()
+            ax.plot(filtered_data['forecast'], m*filtered_data['forecast']+b, color='red')
             st.pyplot(fig)
 
     # ---- Risk Alert ----
     elif section == "Risk Alert":
-        st.subheader("Risk Alerts")
         threshold = st.slider("Set Usage Threshold", min_value=0, max_value=int(filtered_data['forecast'].max()), value=int(filtered_data['forecast'].max()*0.8))
         high_risk = filtered_data[filtered_data['forecast'] > threshold]
         if high_risk.empty:
@@ -224,7 +158,6 @@ else:
 
     # ---- Model Accuracy ----
     elif section == "Model Accuracy":
-        st.subheader("Model Accuracy Overview")
-        st.metric("Mean Absolute Error (MAE)", round(abs_error.mean(),2))
-        st.metric("Mean Squared Error (MSE)", round((filtered_data['difference']**2).mean(),2))
+        st.metric("MAE", round(abs_error.mean(),2))
+        st.metric("MSE", round((filtered_data['difference']**2).mean(),2))
         st.line_chart(filtered_data.set_index('timestamp')['difference'])
