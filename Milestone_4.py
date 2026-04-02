@@ -48,37 +48,24 @@ else:
         horizontal=True
     )
 
-    # ---- KPI Overview (RESTORED COLORS) ----
+    # ---- KPI Overview ----
     if section == "KPI Overview":
         units = filtered_data['units_used']
         forecast = filtered_data['forecast']
-        high_demand_count = (units > forecast).sum()
-        low_demand_count = (units < forecast).sum()
 
         col1, col2, col3, col4 = st.columns(4)
-        col1.markdown(f"<div style='background-color:#5c5174; padding:8px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Total Forecast</h4><h3>{int(forecast.sum())}</h3></div>", unsafe_allow_html=True)
-        col2.markdown(f"<div style='background-color:#66669a; padding:8px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Total Usage</h4><h3>{int(units.sum())}</h3></div>", unsafe_allow_html=True)
-        col3.markdown(f"<div style='background-color:#aaa7cc; padding:8px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Max Forecast</h4><h3>{int(forecast.max())}</h3></div>", unsafe_allow_html=True)
-        col4.markdown(f"<div style='background-color:#926d88; padding:8px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Max Actual Usage</h4><h3>{int(units.max())}</h3></div>", unsafe_allow_html=True)
+        col1.markdown(f"<div style='background-color:#5c5174; padding:8px; border-radius:10px; text-align:center;'><h4>Total Forecast</h4><h3>{int(forecast.sum())}</h3></div>", unsafe_allow_html=True)
+        col2.markdown(f"<div style='background-color:#66669a; padding:8px; border-radius:10px; text-align:center;'><h4>Total Usage</h4><h3>{int(units.sum())}</h3></div>", unsafe_allow_html=True)
+        col3.markdown(f"<div style='background-color:#aaa7cc; padding:8px; border-radius:10px; text-align:center;'><h4>Max Forecast</h4><h3>{int(forecast.max())}</h3></div>", unsafe_allow_html=True)
+        col4.markdown(f"<div style='background-color:#926d88; padding:8px; border-radius:10px; text-align:center;'><h4>Max Usage</h4><h3>{int(units.max())}</h3></div>", unsafe_allow_html=True)
 
         st.markdown("<br><br>", unsafe_allow_html=True)
 
         col5, col6, col7, col8 = st.columns(4)
-        col5.markdown(f"<div style='background-color:#be9fbf; padding:8px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Average Forecast</h4><h3>{round(forecast.mean(),2)}</h3></div>", unsafe_allow_html=True)
-        col6.markdown(f"<div style='background-color:#cdaa7d; padding:8px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Average Usage</h4><h3>{round(units.mean(),2)}</h3></div>", unsafe_allow_html=True)
-        col7.markdown(f"<div style='background-color:#deb887; padding:8px; border-radius:10px; text-align:center;'>"
-                      f"<h4>MAE</h4><h3>{round(abs_error.mean(),2)}</h3></div>", unsafe_allow_html=True)
-        col8.markdown(f"<div style='background-color:#85364f; padding:8px; border-radius:10px; text-align:center;'>"
-                      f"<h4>Accuracy %</h4><h3>{round(accuracy_pct.mean(),2)}%</h3></div>", unsafe_allow_html=True)
-
-        st.markdown(f"**High Demand Periods:** {high_demand_count}")
-        st.markdown(f"**Low Demand Periods:** {low_demand_count}")
+        col5.markdown(f"<div style='background-color:#be9fbf; padding:8px; border-radius:10px; text-align:center;'><h4>Avg Forecast</h4><h3>{round(forecast.mean(),2)}</h3></div>", unsafe_allow_html=True)
+        col6.markdown(f"<div style='background-color:#cdaa7d; padding:8px; border-radius:10px; text-align:center;'><h4>Avg Usage</h4><h3>{round(units.mean(),2)}</h3></div>", unsafe_allow_html=True)
+        col7.markdown(f"<div style='background-color:#deb887; padding:8px; border-radius:10px; text-align:center;'><h4>MAE</h4><h3>{round(abs_error.mean(),2)}</h3></div>", unsafe_allow_html=True)
+        col8.markdown(f"<div style='background-color:#85364f; padding:8px; border-radius:10px; text-align:center;'><h4>Accuracy %</h4><h3>{round(accuracy_pct.mean(),2)}%</h3></div>", unsafe_allow_html=True)
 
     # ---- Demand Trend ----
     elif section == "Demand Trend":
@@ -86,7 +73,8 @@ else:
             "Choose graph:",
             ["Forecast vs Actual Usage", "Line Chart", "Bar Chart", "Area Chart",
              "Service Pie Chart", "Scatter", "Histogram", "Cumulative Usage",
-             "Top Services", "Region Share", "Monthly Trend"],
+             "Top Services", "Region Share", "Monthly Trend", "Quarterly Trend",
+             "Error Trend", "Scatter with Trendline"],
             horizontal=True
         )
 
@@ -135,8 +123,7 @@ else:
             st.line_chart(cumulative)
 
         elif graph_type == "Top Services":
-            service_summary = filtered_data.groupby('service_type')[['units_used','forecast']].sum()
-            st.bar_chart(service_summary)
+            st.bar_chart(filtered_data.groupby('service_type')[['units_used','forecast']].sum())
 
         elif graph_type == "Region Share":
             region_data = filtered_data.groupby('region')['forecast'].sum().sort_values(ascending=False)
@@ -158,38 +145,40 @@ else:
             monthly_data = monthly_data.set_index('YearMonth')
             st.line_chart(monthly_data)
 
+        elif graph_type == "Quarterly Trend":
+            quarterly_data = filtered_data.groupby(['year','quarter'])[['units_used','forecast']].sum().reset_index()
+            quarterly_data['YQ'] = quarterly_data['year'].astype(str) + "-Q" + quarterly_data['quarter'].astype(str)
+            st.bar_chart(quarterly_data.set_index('YQ')[['units_used','forecast']])
+
+        elif graph_type == "Error Trend":
+            st.line_chart(filtered_data.set_index('timestamp')['difference'])
+
+        elif graph_type == "Scatter with Trendline":
+            fig, ax = plt.subplots()
+            ax.scatter(filtered_data['forecast'], filtered_data['units_used'])
+            m,b = np.polyfit(filtered_data['forecast'], filtered_data['units_used'],1)
+            ax.plot(filtered_data['forecast'], m*filtered_data['forecast']+b, color='red')
+            st.pyplot(fig)
+
     # ---- Risk Alert ----
     elif section == "Risk Alert":
-        st.subheader("Risk Alerts")
-
         threshold = st.slider(
-            "Set Usage Threshold",
-            min_value=0,
-            max_value=int(filtered_data['forecast'].max()),
-            value=int(filtered_data['forecast'].max() * 0.8)
+            "Threshold",
+            0,
+            int(filtered_data['forecast'].max()),
+            int(filtered_data['forecast'].max()*0.8)
         )
 
-        filtered_data['Risk Level'] = np.where(
-            filtered_data['forecast'] > threshold,
-            "🔴 Very Risky",
-            "🟢 Under Risk"
-        )
+        filtered_data['Risk'] = np.where(filtered_data['forecast'] > threshold, "🔴 Very Risky", "🟢 Safe")
 
-        very_risky_count = (filtered_data['forecast'] > threshold).sum()
-        safe_count = (filtered_data['forecast'] <= threshold).sum()
         risk_value = filtered_data.loc[filtered_data['forecast'] > threshold, 'forecast'].sum()
 
         col1, col2, col3 = st.columns(3)
-        col1.metric("🔴 Very Risky Count", very_risky_count)
-        col2.metric("🟢 Under Risk Count", safe_count)
-        col3.metric("⚠️ Risk Value", int(risk_value))
+        col1.metric("Very Risky", (filtered_data['forecast'] > threshold).sum())
+        col2.metric("Safe", (filtered_data['forecast'] <= threshold).sum())
+        col3.metric("Risk Value", int(risk_value))
 
-        if very_risky_count == 0:
-            st.success("✅ All safe")
-        else:
-            st.warning(f"⚠️ {very_risky_count} high-risk records detected!")
-
-        st.dataframe(filtered_data[['timestamp','region','service_type','forecast','units_used','Risk Level']])
+        st.dataframe(filtered_data[['timestamp','region','service_type','forecast','units_used','Risk']])
 
     # ---- Model Accuracy ----
     elif section == "Model Accuracy":
