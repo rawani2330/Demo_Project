@@ -10,9 +10,12 @@ st.title("XGBoost Forecast Dashboard")
 # ---- Load Data ----
 data = pd.read_csv("forecast_output.csv")
 
-# FIX: Safe datetime conversion
+# FIX datetime
 data['timestamp'] = pd.to_datetime(data['timestamp'], errors='coerce')
 data = data.dropna(subset=['timestamp'])
+
+# 🔥 FIX duplicate service names
+data['service_type'] = data['service_type'].str.strip().str.lower()
 
 data['year'] = data['timestamp'].dt.year
 data['quarter'] = data['timestamp'].dt.quarter
@@ -38,7 +41,7 @@ filtered_data = data[
     (data['service_type'].isin(selected_services)) &
     (data['year'].isin(selected_years)) &
     (data['quarter'].isin(selected_quarters))
-].copy()
+]
 
 # ---- Check Empty ----
 if filtered_data.empty:
@@ -50,7 +53,6 @@ else:
     filtered_data['difference'] = filtered_data['units_used'] - filtered_data['forecast']
     abs_error = filtered_data['difference'].abs()
 
-    # FIX: divide by zero handled
     accuracy_pct = np.where(
         filtered_data['units_used'] == 0,
         0,
@@ -111,68 +113,6 @@ else:
             plt.xticks(rotation=45)
             st.pyplot(fig)
 
-       elif graph_type == "Service Pie Chart":
-             service_data = filtered_data.groupby('service_type')['forecast'].sum().sort_values(ascending=False)
-
-            # Optional: make labels pretty (Title Case)
-            service_data.index = service_data.index.str.title()
-
-            fig, ax = plt.subplots(figsize=(8,8))
-
-            wedges, _, _ = ax.pie(
-                service_data.values,
-                autopct='%1.1f%%',
-                startangle=90
-        )
-
-        ax.legend(
-            wedges,
-            service_data.index,
-            title="Service Type",
-            loc="center left",
-            bbox_to_anchor=(1, 0, 0.5, 1)
-        )
-
-        ax.axis('equal')
-        st.pyplot(fig)
-
-        elif graph_type == "Region Share":
-            region_data = filtered_data.groupby('region')['forecast'].sum().sort_values(ascending=False)
-            top = region_data.head(5).copy()
-            others = region_data.iloc[5:].sum()
-            if others > 0:
-                top.loc["Others"] = others  # FIXED
-
-            fig, ax = plt.subplots(figsize=(7,7))
-            ax.pie(top.values, labels=top.index, autopct='%1.1f%%')
-            ax.axis('equal')
-            st.pyplot(fig)
-
-        elif graph_type == "Monthly Trend":
-            df_month = filtered_data.set_index('timestamp')
-            monthly = df_month.resample('MS')[['units_used','forecast']].sum()  # FIXED
-            st.line_chart(monthly)
-
-        elif graph_type == "Quarterly Trend":
-            q = filtered_data.groupby(['year','quarter'])[['units_used','forecast']].sum().reset_index()
-            q['YQ'] = q['year'].astype(str) + "-Q" + q['quarter'].astype(str)
-            st.bar_chart(q.set_index('YQ')[['units_used','forecast']])
-
-        elif graph_type == "Error Trend":
-            st.line_chart(filtered_data.set_index('timestamp')['difference'])
-
-        elif graph_type == "Scatter with Trendline":
-            fig, ax = plt.subplots()
-            x = filtered_data['forecast']
-            y = filtered_data['units_used']
-            ax.scatter(x, y)
-
-            if len(x) > 1:
-                m, b = np.polyfit(x, y, 1)
-                ax.plot(x, m*x + b)
-
-            st.pyplot(fig)
-
         elif graph_type == "Line Chart":
             st.line_chart(filtered_data.set_index('timestamp')[['units_used','forecast']])
 
@@ -181,6 +121,26 @@ else:
 
         elif graph_type == "Area Chart":
             st.area_chart(filtered_data.set_index('timestamp')['forecast'])
+
+        # ✅ FIXED PIE CHART (clean services + all visible)
+        elif graph_type == "Service Pie Chart":
+            service_data = filtered_data.groupby('service_type')['forecast'].sum().sort_values(ascending=False)
+
+            service_data.index = service_data.index.str.title()
+
+            fig, ax = plt.subplots(figsize=(7,7))
+            wedges, _, _ = ax.pie(
+                service_data.values,
+                autopct='%1.1f%%',
+                startangle=90
+            )
+
+            ax.legend(wedges, service_data.index,
+                      title="Service Type",
+                      loc="center left",
+                      bbox_to_anchor=(1,0,0.5,1))
+
+            st.pyplot(fig)
 
         elif graph_type == "Scatter":
             fig, ax = plt.subplots()
@@ -200,6 +160,38 @@ else:
         elif graph_type == "Top Services":
             st.bar_chart(filtered_data.groupby('service_type')[['units_used','forecast']].sum())
 
+        elif graph_type == "Region Share":
+            region_data = filtered_data.groupby('region')['forecast'].sum().sort_values(ascending=False)
+
+            fig, ax = plt.subplots(figsize=(7,7))
+            ax.pie(region_data.values, labels=region_data.index, autopct='%1.1f%%')
+            ax.axis('equal')
+            st.pyplot(fig)
+
+        # ✅ FIXED MONTHLY TREND
+        elif graph_type == "Monthly Trend":
+            df_month = filtered_data.set_index('timestamp')
+            monthly = df_month.resample('MS')[['units_used','forecast']].sum()
+            st.line_chart(monthly)
+
+        elif graph_type == "Quarterly Trend":
+            q = filtered_data.groupby(['year','quarter'])[['units_used','forecast']].sum().reset_index()
+            q['YQ'] = q['year'].astype(str) + "-Q" + q['quarter'].astype(str)
+            st.bar_chart(q.set_index('YQ')[['units_used','forecast']])
+
+        elif graph_type == "Error Trend":
+            st.line_chart(filtered_data.set_index('timestamp')['difference'])
+
+        elif graph_type == "Scatter with Trendline":
+            fig, ax = plt.subplots()
+            ax.scatter(filtered_data['forecast'], filtered_data['units_used'])
+
+            if len(filtered_data) > 1:
+                m, b = np.polyfit(filtered_data['forecast'], filtered_data['units_used'], 1)
+                ax.plot(filtered_data['forecast'], m*filtered_data['forecast'] + b)
+
+            st.pyplot(fig)
+
     # ================= RISK =================
     elif section == "Risk Alert":
         threshold = st.slider(
@@ -215,8 +207,17 @@ else:
             "🟢 Safe"
         )
 
-        st.metric("Very Risky Count", (filtered_data['forecast'] > threshold).sum())
-        st.metric("Safe Count", (filtered_data['forecast'] <= threshold).sum())
+        risk_value = filtered_data.loc[filtered_data['forecast'] > threshold, 'forecast'].sum()
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Very Risky Count", (filtered_data['forecast'] > threshold).sum())
+        col2.metric("Safe Count", (filtered_data['forecast'] <= threshold).sum())
+        col3.metric("Risk Value", int(risk_value))
+
+        if (filtered_data['forecast'] > threshold).sum() == 0:
+            st.success("All regions are safe")
+        else:
+            st.warning("High risk detected!")
 
         st.dataframe(filtered_data[['timestamp','region','service_type','forecast','units_used','Risk']])
 
